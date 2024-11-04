@@ -27,7 +27,7 @@ last_gesture = None
 gesture_added = False
 
 # Variables to handle model switching
-current_group_number = None
+current_group_number = 0
 model = None
 label_encoder = None
 
@@ -141,6 +141,7 @@ while True:
     elif key in [ord(str(i)) for i in range(1, 7)]:
         # Load model corresponding to the pressed number key
         group_number = key - ord('0')  # Convert key code to integer
+        print("group number ", group_number)
         if group_number != current_group_number:
             load_model(group_number)
             current_group_number = group_number
@@ -166,11 +167,11 @@ while True:
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
     else:
         if model is None:
-            cv2.putText(frame, 'No model loaded. Press 1-6 to load a model.', (30, 30),
+            cv2.putText(frame, 'No model loaded.', (30, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
         else:
             # If no hands are detected, display a message
-            cv2.putText(frame, 'No hands detected', (30, 30),
+            cv2.putText(frame, 'Model Loaded, No hands detected', (30, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
 
     # Display the current sentence at the bottom of the frame
