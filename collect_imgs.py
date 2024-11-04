@@ -5,12 +5,20 @@ DATA_DIR = './data'
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
-# Define your classes: 5 alphabets and 5 words
-class_names  = ["Thank You", "Love", "Dogs"]
+# Define all the classes and their corresponding numbers
+class_names = [
+    'A', 'B', 'C', 'D', 'E',
+    'F', 'G', 'H', 'I', 'J',
+    'K', 'L', 'M', 'N', 'O',
+    'P', 'Q', 'R', 'S', 'T',
+    'U', 'V', 'W', 'X', 'Y',
+    'Z', 'DOG', 'THANK_YOU', 'Love'
+]
 
+# Create a list of tuples (class_number, class_name)
+class_list = [(i+1, name) for i, name in enumerate(class_names)]
 
-number_of_classes = len(class_names)
-dataset_size = 200  # Number of images per class
+dataset_size = 50  # Number of images per class
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
@@ -19,15 +27,14 @@ cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-for class_name in class_names:
-    class_dir = os.path.join(DATA_DIR, class_name)
+for class_number, class_name in class_list:
+    folder_name = f"{class_number}_{class_name}"
+    class_dir = os.path.join(DATA_DIR, folder_name)
 
-    # Corrected: Use class_dir instead of os.path.join(DATA_DIR, str(j))
     if not os.path.exists(class_dir):
         os.makedirs(class_dir)
 
-    # Corrected: Use class_name instead of j
-    print('Collecting data for class "{}"'.format(class_name))
+    print(f'Collecting data for class "{class_name}"')
 
     # Instructional loop: Wait for user to press 'Q' to start capturing
     while True:
@@ -38,8 +45,8 @@ for class_name in class_names:
             cv2.destroyAllWindows()
             exit()
 
-        cv2.putText(frame, 'Ready? Press "Q" ! :)', (100, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 255, 0), 3,
-                    cv2.LINE_AA)
+        cv2.putText(frame, f'Ready to collect "{class_name}"? Press "Q" to start!', (50, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
         cv2.imshow('frame', frame)
         if cv2.waitKey(25) & 0xFF == ord('q'):
             break
@@ -51,13 +58,14 @@ for class_name in class_names:
             print("Failed to capture frame.")
             continue
 
+        cv2.putText(frame, f'Collecting "{class_name}": Image {counter+1}/{dataset_size}', (50, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
         cv2.imshow('frame', frame)
         if cv2.waitKey(25) & 0xFF == ord('q'):
             print("Data collection interrupted by user.")
             break
 
-        # Corrected: Use class_dir instead of os.path.join(DATA_DIR, str(j))
-        img_path = os.path.join(class_dir, '{}.jpg'.format(counter))
+        img_path = os.path.join(class_dir, f'{counter}.jpg')
         cv2.imwrite(img_path, frame)
         counter += 1
 

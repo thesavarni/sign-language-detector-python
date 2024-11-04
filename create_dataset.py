@@ -3,6 +3,7 @@ import pickle
 import mediapipe as mp
 import cv2
 import numpy as np
+import re
 
 # Initialize Mediapipe Hands
 mp_hands = mp.solutions.hands
@@ -14,53 +15,75 @@ hands = mp_hands.Hands(
 
 DATA_DIR = './data'
 
-data = []
-labels = []
+# Get list of class directories sorted by their class number
+def get_sorted_class_dirs(data_dir):
+    class_dirs = []
+    for item in os.listdir(data_dir):
+        dir_path = os.path.join(data_dir, item)
+        if os.path.isdir(dir_path):
+            # Extract class number from folder name
+            match = re.match(r'(\d+)_', item)
+            if match:
+                class_number = int(match.group(1))
+                class_dirs.append((class_number, dir_path))
+    # Sort by class number
+    class_dirs.sort(key=lambda x: x[0])
+    return class_dirs
 
-for dir_ in os.listdir(DATA_DIR):
-    class_dir = os.path.join(DATA_DIR, dir_)
-    if not os.path.isdir(class_dir):
-        continue
+class_dirs = get_sorted_class_dirs(DATA_DIR)
 
-    print(f'Processing class "{dir_}"')
-    for img_path in os.listdir(class_dir):
-        data_aux = []
-        x_ = []
-        y_ = []
-        z_ = []
+# Group the class directories into sets of 5
+group_size = 5
+groups = [class_dirs[i:i+group_size] for i in range(0, len(class_dirs), group_size)]
 
-        img = cv2.imread(os.path.join(class_dir, img_path))
-        if img is None:
-            continue
+for idx, group in enumerate(groups):
+    data = []
+    labels = []
+    print(f'Processing group {idx+1}')
+    for class_number, class_dir in group:
+        class_name = os.path.basename(class_dir).split('_', 1)[1]
+        print(f'  Processing class "{class_name}"')
+        for img_name in os.listdir(class_dir):
+            data_aux = []
+            x_ = []
+            y_ = []
+            z_ = []
 
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img_path = os.path.join(class_dir, img_name)
+            img = cv2.imread(img_path)
+            if img is None:
+                continue
 
-        results = hands.process(img_rgb)
-        if results.multi_hand_landmarks:
-            hand_landmarks = results.multi_hand_landmarks[0]
-            # Extract x, y, z coordinates
-            for lm in hand_landmarks.landmark:
-                x_.append(lm.x)
-                y_.append(lm.y)
-                z_.append(lm.z)
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            # Normalize landmarks by subtracting the minimum value
-            min_x = min(x_)
-            min_y = min(y_)
-            min_z = min(z_)
+            results = hands.process(img_rgb)
+            if results.multi_hand_landmarks:
+                hand_landmarks = results.multi_hand_landmarks[0]
+                # Extract x, y, z coordinates
+                for lm in hand_landmarks.landmark:
+                    x_.append(lm.x)
+                    y_.append(lm.y)
+                    z_.append(lm.z)
 
-            for x_val, y_val, z_val in zip(x_, y_, z_):
-                data_aux.append(x_val - min_x)
-                data_aux.append(y_val - min_y)
-                data_aux.append(z_val - min_z)
+                # Normalize landmarks by subtracting the minimum value
+                min_x = min(x_)
+                min_y = min(y_)
+                min_z = min(z_)
 
-            data.append(data_aux)
-            labels.append(dir_)
-        else:
-            print(f'No hand landmarks detected in image: {img_path}')
+                for x_val, y_val, z_val in zip(x_, y_, z_):
+                    data_aux.append(x_val - min_x)
+                    data_aux.append(y_val - min_y)
+                    data_aux.append(z_val - min_z)
 
-# Save the processed data
-with open('data.pickle', 'wb') as f:
-    pickle.dump({'data': data, 'labels': labels}, f)
+                data.append(data_aux)
+                labels.append(class_name)
+            else:
+                print(f'    No hand landmarks detected in image: {img_name}')
 
-print("Data processing complete. Saved to 'data.pickle'.")
+    # Save the processed data for this group
+    pickle_file = f'data_group_{idx+1}.pickle'
+    with open(pickle_file, 'wb') as f:
+        pickle.dump({'data': data, 'labels': labels}, f)
+    print(f"  Saved group {idx+1} data to '{pickle_file}'.\n")
+
+print("Data processing complete for all groups.")

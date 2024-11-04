@@ -4,12 +4,6 @@ import mediapipe as mp
 import numpy as np
 import time
 
-# Load the trained model and label encoder
-with open('model.p', 'rb') as f:
-    model_dict = pickle.load(f)
-model = model_dict['model']
-label_encoder = model_dict['label_encoder']
-
 # Initialize Mediapipe Hands
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
@@ -31,6 +25,30 @@ gesture_start_time = None
 gesture_threshold = 0.5  # seconds to confirm gesture
 last_gesture = None
 gesture_added = False
+
+# Variables to handle model switching
+current_group_number = None
+model = None
+label_encoder = None
+
+# Function to load the model based on group number
+def load_model(group_number):
+    global model, label_encoder
+    model_file = f'model_group_{group_number}.p'
+    try:
+        with open(model_file, 'rb') as f:
+            model_dict = pickle.load(f)
+        model = model_dict['model']
+        label_encoder = model_dict['label_encoder']
+        print(f"Loaded model for group {group_number}.")
+    except FileNotFoundError:
+        print(f"Model file '{model_file}' not found.")
+        model = None
+        label_encoder = None
+
+# Display initial instructions
+print("Press number keys corresponding to the group number to load the model.")
+print("Groups correspond to sets of 5 classes (e.g., Group 1: A-E, Group 2: F-J, etc.)")
 
 while True:
     data_aux = []
@@ -57,7 +75,7 @@ while True:
 
     detected_gesture = None
 
-    if results.multi_hand_landmarks:
+    if results.multi_hand_landmarks and model is not None:
         hand_landmarks = results.multi_hand_landmarks[0]
 
         # Draw hand landmarks on the frame
@@ -98,7 +116,7 @@ while True:
 
         detected_gesture = predicted_class
     else:
-        # If no hands are detected, set detected_gesture to None
+        # If no hands are detected or model is not loaded, set detected_gesture to None
         detected_gesture = None
 
     # Gesture stability detection
@@ -116,14 +134,20 @@ while True:
                 current_sentence += detected_gesture
                 gesture_added = True
 
-    # Handle keyboard inputs for space and clearing the sentence
+    # Handle keyboard inputs for model switching, space, and clearing the sentence
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         break
+    elif key in [ord(str(i)) for i in range(1, 7)]:
+        # Load model corresponding to the pressed number key
+        group_number = key - ord('0')  # Convert key code to integer
+        if group_number != current_group_number:
+            load_model(group_number)
+            current_group_number = group_number
     elif key == ord(' '):
         # Add a space to the sentence
         current_sentence += ' '
-    elif key == ord('\r') or key == ord('\n'):
+    elif key == ord('c'):
         # Clear the current sentence
         current_sentence = ""
         print("Sentence cleared.")
@@ -141,9 +165,13 @@ while True:
         cv2.putText(frame, detected_gesture, (x1, y1 - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
     else:
-        # If no hands are detected, display a message
-        cv2.putText(frame, 'No hands detected', (30, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+        if model is None:
+            cv2.putText(frame, 'No model loaded. Press 1-6 to load a model.', (30, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+        else:
+            # If no hands are detected, display a message
+            cv2.putText(frame, 'No hands detected', (30, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
 
     # Display the current sentence at the bottom of the frame
     cv2.putText(frame, f'Sentence: {current_sentence}', (10, H - 20),
