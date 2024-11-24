@@ -38,6 +38,7 @@ print(f'Image shape: {images.shape[1:]}')
 label_encoder = LabelEncoder()
 labels_encoded = label_encoder.fit_transform(labels)
 num_classes = len(label_encoder.classes_)
+
 # Normalize images
 images = images.astype('float32') / 255.0
 
