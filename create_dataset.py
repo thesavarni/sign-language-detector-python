@@ -59,7 +59,6 @@ for idx, group in enumerate(groups):
             results = hands.process(img_rgb)
             if results.multi_hand_landmarks:
                 hand_landmarks = results.multi_hand_landmarks[0]
-                # Extract x, y, z coordinates
                 for lm in hand_landmarks.landmark:
                     x_.append(lm.x)
                     y_.append(lm.y)
@@ -74,7 +73,7 @@ for idx, group in enumerate(groups):
                     data_aux.append(x_val - min_x)
                     data_aux.append(y_val - min_y)
                     data_aux.append(z_val - min_z)
-
+                # [(x1,y1,z1), (x2,y2,z2), ]
                 data.append(data_aux)
                 labels.append(class_name)
             else:
@@ -87,3 +86,6 @@ for idx, group in enumerate(groups):
     print(f"  Saved group {idx+1} data to '{pickle_file}'.\n")
 
 print("Data processing complete for all groups.")
+# for 1 image
+# [(22 landmarks ka list)] -> A (fist image) -> 200 more images all of A
+# # [(22 landmarks ka list)] -> A (fist image) -> 200 more images all of B

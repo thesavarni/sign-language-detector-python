@@ -1,5 +1,5 @@
 import os
-import cv2
+import cv2 # OpenCV
 
 DATA_DIR = './data'
 if not os.path.exists(DATA_DIR):
@@ -18,7 +18,7 @@ class_names = [
 # Create a list of tuples (class_number, class_name)
 class_list = [(i+1, name) for i, name in enumerate(class_names)]
 
-dataset_size = 50  # Number of images per class
+dataset_size = 200  # Number of images per class
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
