@@ -42,6 +42,7 @@ num_classes = len(label_encoder.classes_)
 # Normalize images
 images = images.astype('float32') / 255.0
 
+
 # Convert labels to categorical
 labels_categorical = utils.to_categorical(labels_encoded, num_classes)
 
