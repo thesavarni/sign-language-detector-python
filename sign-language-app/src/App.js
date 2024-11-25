@@ -111,34 +111,30 @@ const App = () => {
       <div className="content-platform">
         <div className="content">
           <div className="gesture-display">
-            {mode === 'training' ? (
             <div className="gesture-info">
               <h2>Gesture: {currentGesture}</h2>
-              {console.log("Gesture", currentGesture)}
-              {console.log("PUBLIC URL", process.env.PUBLIC_URL)}
               {currentGesture ? (
                 <img
+                  className="gesture-image"
                   src={`/asl_dataset/${currentGesture}.png`}
                   alt={`Hand sign for ${currentGesture}`}
                 />
               ) : (
                 <p>No gesture selected.</p>
               )}
-            </div>            
-            ) : (
-              <div className="gesture-info">
-                <h2>Make Gesture for Alphabet: {currentGesture}</h2>
-              </div>
-            )}
+            </div>
           </div>
 
           <div className="camera-feed">
-            <video ref={videoRef} autoPlay></video>
-            <button className="check-gesture-button" onClick={checkGesture}>
-              Check Gesture
-            </button>
+            <div className="gesture-info">
+              <h2>Make Gesture for: {currentGesture}</h2>
+              <video ref={videoRef} autoPlay className="video-feed"></video>
+            </div>
           </div>
         </div>
+        <button className="check-gesture-button" onClick={checkGesture}>
+          Check Gesture
+        </button>
       </div>
 
       <div className="mode-toggle">

@@ -6,14 +6,16 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .App {
   background-color: #ffffff;
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  width: 800px;
+  width: 90%;
+  max-width: 800px;
   padding: 20px;
 }
 
@@ -57,13 +59,15 @@ button.active {
 
 .content {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  align-items: stretch;
 }
 
-.gesture-display {
-  flex: 1;
+.gesture-display, .camera-feed {
+  flex: 1 1 45%;
   text-align: center;
-  margin-right: 20px;
+  margin: 10px;
 }
 
 .gesture-info {
@@ -71,18 +75,17 @@ button.active {
   padding: 20px;
   border-radius: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.camera-feed {
-  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  justify-content: center;
 }
 
-video {
+.gesture-image, .video-feed {
   width: 100%;
   max-width: 400px;
+  height: 300px;
+  object-fit: cover;
   border-radius: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 10px;
@@ -97,6 +100,9 @@ video {
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s;
+  margin: 20px auto;
+  margin-top: 50px;
+  display: block;
 }
 
 .check-gesture-button:hover {
@@ -114,4 +120,15 @@ video {
   margin-top: 20px;
   font-size: 18px;
   font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .content {
+    flex-direction: column;
+  }
+
+  .gesture-display, .camera-feed {
+    flex: 1 1 100%;
+    margin: 10px 0;
+  }
 }
