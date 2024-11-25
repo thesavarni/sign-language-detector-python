@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+import USFlag from './flags/us-flag.svg'; // Import the SVG file
+import IndiaFlag from './flags/india-flag-image.png'; // Import the SVG file
+import logo1 from './mudra-ai-logos/logo1.jpeg'
+
+
 
 const App = () => {
   const [mode, setMode] = useState('training'); // 'training' or 'testing'
@@ -52,7 +57,7 @@ const App = () => {
           const formData = new FormData();
           formData.append('image', blob, 'gesture.jpg');
           formData.append('expected_sign', currentGesture);
-          formData.append('language', language )
+          formData.append('language', language)
 
           fetch('https://web-production-08f6.up.railway.app/predict', {
             method: 'POST',
@@ -84,7 +89,8 @@ const App = () => {
   return (
     <div className="App">
       <div className="header">
-        <h1>Mudra AI</h1>
+      <img src={logo1} className="logo"  style={{ borderRadius: '50%' }}/>
+        <h1>MUDRA AI</h1>
       </div>
 
       <div className="language-toggle">
@@ -95,7 +101,8 @@ const App = () => {
             setFeedback('');
           }}
         >
-          ASL
+          <img src={USFlag} className="button-icon" />
+          <span>ASL</span>
         </button>
         <button
           className={language === 'isl' ? 'active' : ''}
@@ -104,7 +111,12 @@ const App = () => {
             setFeedback('');
           }}
         >
-          ISL
+        <img 
+          src={IndiaFlag}
+          style={{ width: '40px', height: '40px' }}
+          className="button-icon" 
+        />
+          <span>ISL</span>
         </button>
       </div>
 
