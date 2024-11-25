@@ -7,8 +7,12 @@ import warnings
 warnings.filterwarnings("ignore")
 from flask_cors import CORS
 
+warnings.filterwarnings("ignore")
+
 app = Flask(__name__)
-CORS(app)
+
+# Restrict CORS to only allow requests from your frontend
+CORS(app, resources={r"/predict": {"origins": "https://mudra-ai.netlify.app"}})
 
 # Initialize MediaPipe hands
 mp_hands = mp.solutions.hands
@@ -137,4 +141,4 @@ def predict():
         return jsonify({'error': 'Could not extract landmarks'}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
