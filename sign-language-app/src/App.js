@@ -18,7 +18,7 @@ const App = () => {
 
   useEffect(() => {
     requestGesture();
-  }, [language]);
+  }, [language, mode]);
 
   useEffect(() => {
     const hands = new Hands({
@@ -28,7 +28,7 @@ const App = () => {
     });
 
     hands.setOptions({
-      maxNumHands: 2,
+      maxNumHands: 1,
       modelComplexity: 1,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5,
@@ -37,19 +37,21 @@ const App = () => {
     hands.onResults(onResults);
 
     const videoElement = videoRef.current;
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({ image: videoElement });
-      },
-      width: 1280,
-      height: 720,
-    });
-    camera.start();
+    if (videoElement) {
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await hands.send({ image: videoElement });
+        },
+        width: 1280,
+        height: 720,
+      });
+      camera.start();
 
-    // Clean up on unmount
-    return () => {
-      camera.stop();
-    };
+      // Clean up on unmount
+      return () => {
+        camera.stop();
+      };
+    }
   }, []);
 
   const onResults = (results) => {
@@ -64,6 +66,8 @@ const App = () => {
 
     canvasCtx.save();
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    // Draw the video frame
     canvasCtx.drawImage(
       results.image,
       0,
@@ -72,6 +76,7 @@ const App = () => {
       canvasElement.height
     );
 
+    // Draw the landmarks
     if (results.multiHandLandmarks && results.multiHandedness) {
       for (let index = 0; index < results.multiHandLandmarks.length; index++) {
         const classification = results.multiHandedness[index];
@@ -167,7 +172,7 @@ const App = () => {
             });
         },
         'image/jpeg',
-        0.95 // Quality parameter (optional)
+        0.95
       );
     } else {
       setFeedback('Video not ready. Please try again.');
@@ -181,6 +186,7 @@ const App = () => {
           src={logo1}
           className="logo"
           style={{ borderRadius: '50%' }}
+          alt="Logo"
         />
         <h1>MUDRA AI</h1>
       </div>
@@ -193,7 +199,7 @@ const App = () => {
             setFeedback('');
           }}
         >
-          <img src={USFlag} className="button-icon" />
+          <img src={USFlag} className="button-icon" alt="US Flag" />
           <span>ASL</span>
         </button>
         <button
@@ -207,6 +213,7 @@ const App = () => {
             src={IndiaFlag}
             style={{ width: '40px', height: '40px' }}
             className="button-icon"
+            alt="India Flag"
           />
           <span>ISL</span>
         </button>
@@ -217,12 +224,20 @@ const App = () => {
           <div className="gesture-display">
             <div className="gesture-info">
               <h2>Gesture: {currentGesture}</h2>
+              {console.log("currentGesture", currentGesture)}
               {currentGesture ? (
-                <img
-                  className="gesture-image"
-                  src={`/asl_dataset/${currentGesture}.png`}
-                  alt={`Hand sign for ${currentGesture}`}
-                />
+                mode === 'training' ? (
+                  <img
+                    className="gesture-image"
+                    src={`/asl_dataset/${currentGesture}.png`}
+                    alt={`Hand sign for ${currentGesture}`}
+                  />
+                ) : (
+                  <img
+                    className="gesture-image"
+                    src={`/alphabet_images/${currentGesture}.png`}
+                  />
+                )
               ) : (
                 <p>No gesture selected.</p>
               )}
@@ -233,7 +248,12 @@ const App = () => {
             <div className="gesture-info">
               <h2>Make Gesture for: {currentGesture}</h2>
               <div className="video-container">
-                <video ref={videoRef} className="video-feed"></video>
+                <video
+                  ref={videoRef}
+                  className="video-feed"
+                  autoPlay
+                  playsInline
+                ></video>
                 <canvas ref={canvasRef} className="canvas-overlay"></canvas>
               </div>
             </div>
