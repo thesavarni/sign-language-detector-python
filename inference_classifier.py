@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 warnings.filterwarnings("ignore")
 from flask_cors import CORS
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -141,4 +142,5 @@ def predict():
         return jsonify({'error': 'Could not extract landmarks'}), 400
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
