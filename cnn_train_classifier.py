@@ -1,107 +1,177 @@
-import os
+#Step 3: Design the Multi-Modal Model Architecture
+
+import tensorflow as tf
+from tensorflow.keras.models import Model
+from tensorflow.keras.utils import Sequence
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 import numpy as np
-import cv2
-from tensorflow.keras import models, layers, utils
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-import pickle
+import datetime
+from tensorflow.keras.layers import Input, Dense, Conv2D, MaxPooling2D, Flatten, Dropout, concatenate
 
+# Image branch
+image_input = Input(shape=(128, 128, 3))
 
-PROCESSED_DATA_DIR = './processed_data'
+# Simple CNN architecture
+x = Conv2D(32, (3, 3), activation='relu')(image_input)
+x = MaxPooling2D((2, 2))(x)
+x = Conv2D(64, (3, 3), activation='relu')(x)
+x = MaxPooling2D((2, 2))(x)
+x = Conv2D(128, (3, 3), activation='relu')(x)
+x = MaxPooling2D((2, 2))(x)
+x = Flatten()(x)
+x = Dense(128, activation='relu')(x)
+x = Dropout(0.5)(x)
 
-# Load images and labels
-images = []
-labels = []
+# Landmark branch
+landmark_input = Input(shape=(63,))  # 21 landmarks * 3 coordinates
+y = Dense(128, activation='relu')(landmark_input)
+y = Dropout(0.5)(y)
+y = Dense(64, activation='relu')(y)
+y = Dropout(0.5)(y)
 
-for dir_ in os.listdir(PROCESSED_DATA_DIR):
-    class_dir = os.path.join(PROCESSED_DATA_DIR, dir_)
-    if not os.path.isdir(class_dir):
-        continue
+# Concatenate the outputs
+combined = concatenate([x, y])
 
-    for img_name in os.listdir(class_dir):
-        img_path = os.path.join(class_dir, img_name)
-        img = cv2.imread(img_path)
-        if img is None:
-            continue
+# Final layers
+z = Dense(256, activation='relu')(combined)
+z = Dropout(0.5)(z)
+z = Dense(num_classes, activation='softmax')(z)
 
-        images.append(img)
-        labels.append(dir_)
-
-# Convert to numpy arrays
-images = np.array(images)
-labels = np.array(labels)
-
-print(f'Total images: {images.shape[0]}')
-print(f'Image shape: {images.shape[1:]}')
-
-# Encode labels
-label_encoder = LabelEncoder()
-labels_encoded = label_encoder.fit_transform(labels)
-num_classes = len(label_encoder.classes_)
-
-# Normalize images
-images = images.astype('float32') / 255.0
-
-
-# Convert labels to categorical
-labels_categorical = utils.to_categorical(labels_encoded, num_classes)
-
-# Split data into training and testing sets
-x_train, x_test, y_train, y_test = train_test_split(
-    images, labels_categorical, test_size=0.2, random_state=42, stratify=labels_encoded
-)
-
-# Define the CNN model
-model = models.Sequential()
-model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)))
-model.add(layers.MaxPooling2D((2, 2)))
-
-model.add(layers.Conv2D(64, (3, 3), activation='relu'))
-model.add(layers.MaxPooling2D((2, 2)))
-
-model.add(layers.Conv2D(128, (3, 3), activation='relu'))
-model.add(layers.Flatten())
-
-model.add(layers.Dense(128, activation='relu'))
-model.add(layers.Dense(num_classes, activation='softmax'))
+# Create the model
+model = Model(inputs=[image_input, landmark_input], outputs=z)
 
 # Compile the model
-model.compile(
-    optimizer='adam',
-    loss='categorical_crossentropy',
-    metrics=['accuracy']
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+print("Model architecture:")
+model.summary()
+
+# If not already done, ensure that your data arrays are numpy arrays and have the correct data types
+# Confirm that images are normalized and of type float32
+X_train_img = X_train_img.astype('float32')  # Already normalized: images = images.astype('float32') / 255.0
+X_test_img = X_test_img.astype('float32')    # Already normalized
+
+# Ensure landmarks are float32
+X_train_lm = X_train_lm.astype('float32')
+X_test_lm = X_test_lm.astype('float32')
+
+# Ensure labels are float32
+y_train_cat = y_train_cat.astype('float32')
+y_test_cat = y_test_cat.astype('float32')
+
+# Define the ASLSequence class
+class ASLSequence(Sequence):
+    def __init__(self, X_img, X_lm, y, batch_size=32, augment=False):
+        self.X_img = X_img
+        self.X_lm = X_lm
+        self.y = y
+        self.batch_size = batch_size
+        self.augment = augment
+        self.indices = np.arange(len(self.y))
+        self.on_epoch_end()
+
+    def __len__(self):
+        return int(np.ceil(len(self.y) / self.batch_size))
+
+    def __getitem__(self, index):
+        # Generate indices for the batch
+        start = index * self.batch_size
+        end = min((index + 1) * self.batch_size, len(self.y))
+        batch_indices = self.indices[start:end]
+
+        # Generate data
+        img_batch = self.X_img[batch_indices]
+        lm_batch = self.X_lm[batch_indices]
+        y_batch = self.y[batch_indices]
+
+        if self.augment:
+            # Apply augmentation to images and landmarks
+            img_batch, lm_batch = self.__augment_batch(img_batch, lm_batch)
+
+        # Return inputs as a tuple
+        return (img_batch, lm_batch), y_batch
+
+    def on_epoch_end(self):
+        # Shuffle indices after each epoch
+        np.random.shuffle(self.indices)
+
+    def __augment_batch(self, img_batch, lm_batch):
+        # Example augmentation: Horizontal flip with 50% probability
+        flip_indices = np.random.rand(len(img_batch)) > 0.5
+        img_batch_flipped = img_batch[flip_indices]
+        lm_batch_flipped = lm_batch[flip_indices]
+
+        # Flip images horizontally
+        img_batch_flipped = img_batch_flipped[:, :, ::-1, :]
+
+        # Adjust landmarks (assuming x-coordinates are normalized between 0 and 1)
+        lm_batch_flipped[:, 0::3] = 1.0 - lm_batch_flipped[:, 0::3]
+
+        # Replace the original batches with the augmented data
+        img_batch[flip_indices] = img_batch_flipped
+        lm_batch[flip_indices] = lm_batch_flipped
+
+        # Add more augmentations if needed (e.g., brightness, scaling)
+        return img_batch, lm_batch
+
+# Training parameters
+batch_size = 32
+epochs = 50
+
+# Instantiate the sequences
+train_sequence = ASLSequence(
+    X_img=X_train_img,
+    X_lm=X_train_lm,
+    y=y_train_cat,
+    batch_size=batch_size,
+    augment=True  # Enable augmentation for training data
 )
 
-# Data Augmentation
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-
-datagen = ImageDataGenerator(
-    rotation_range=15,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    horizontal_flip=True
+val_sequence = ASLSequence(
+    X_img=X_test_img,
+    X_lm=X_test_lm,
+    y=y_test_cat,
+    batch_size=batch_size,
+    augment=False  # No augmentation for validation data
 )
 
-datagen.fit(x_train)
+# Callbacks
+checkpoint = ModelCheckpoint(
+    './best_model.keras',
+    monitor='val_accuracy',
+    save_best_only=True,
+    mode='max'
+)
+
+early_stopping = EarlyStopping(
+    monitor='val_accuracy',
+    patience=10,
+    mode='max',
+    restore_best_weights=True
+)
+
+log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+
+# Verify the data generator (optional but recommended)
+# Fetch a single batch to check shapes and types
+(inputs, labels) = train_sequence[0]
+print("Image batch shape:", inputs[0].shape)    # Expected: (batch_size, 128, 128, 3)
+print("Landmark batch shape:", inputs[1].shape) # Expected: (batch_size, 63)
+print("Label batch shape:", labels.shape)       # Expected: (batch_size, num_classes)
+
+# Ensure the inputs are tuples
+print("Type of inputs:", type(inputs))  # Should be <class 'tuple'>
 
 # Train the model
-batch_size = 32
-epochs = 30
-
 history = model.fit(
-    datagen.flow(x_train, y_train, batch_size=batch_size),
-    steps_per_epoch=len(x_train) // batch_size,
+    train_sequence,
     epochs=epochs,
-    validation_data=(x_test, y_test)
+    validation_data=val_sequence,
+    callbacks=[checkpoint, tensorboard_callback]
 )
 
-# Evaluate the model
-loss, accuracy = model.evaluate(x_test, y_test)
-print(f"Model accuracy on test set: {accuracy * 100:.2f}%")
+# Save the final model
+model.save('./asl_model.keras')
 
-# Save the model and label encoder
-model.save('gesture_recognition_cnn.h5')
-with open('label_encoder_cnn.p', 'wb') as f:
-    pickle.dump(label_encoder, f)
-
-print("Model training complete. Saved to 'gesture_recognition_cnn.h5'.")
+print("Training complete.")
