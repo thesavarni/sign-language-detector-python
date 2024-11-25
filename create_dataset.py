@@ -80,7 +80,7 @@ for idx, group in enumerate(groups):
                 print(f'    No hand landmarks detected in image: {img_name}')
 
     # Save the processed data for this group
-    pickle_file = f'data_group_{idx+1}.pickle'
+    pickle_file = f'./asl_dataset_pickle/data_group_{idx+1}.pickle'
     with open(pickle_file, 'wb') as f:
         pickle.dump({'data': data, 'labels': labels}, f)
     print(f"  Saved group {idx+1} data to '{pickle_file}'.\n")

@@ -1,161 +1,140 @@
+from flask import Flask, request, jsonify
 import pickle
 import cv2
 import mediapipe as mp
 import numpy as np
-import time
-import string
 import warnings
 warnings.filterwarnings("ignore")
+from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)
 
+# Initialize MediaPipe hands
 mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
-
 hands = mp_hands.Hands(
-    static_image_mode=False,
+    static_image_mode=True,  # Since we are processing images, not video
     max_num_hands=1,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
+    min_detection_confidence=0.5
 )
 
-cap = cv2.VideoCapture(0)
+# Load models and label encoders for both ASL and ISL
+models = {
+    'asl': {},
+    'isl': {}
+}
+label_encoders = {
+    'asl': {},
+    'isl': {}
+}
 
-current_sentence = ""
-gesture_start_time = None
-gesture_threshold = 0.5
-last_gesture = None
-gesture_added = False
+# Function to load models during startup
+def load_all_models():
+    for language in ['asl', 'isl']:
+        for group_number in range(1, 7):  # Assuming max group number is 6
+            model_file = f'./{language}_model/model_group_{group_number}.p'
+            try:
+                with open(model_file, 'rb') as f:
+                    model_dict = pickle.load(f)
+                models[language][group_number] = model_dict['model']
+                label_encoders[language][group_number] = model_dict['label_encoder']
+                print(f"Model loaded for {language} group {group_number}")
+            except FileNotFoundError:
+                print(f"Model file not found for {language} group {group_number}")
 
-current_group_number = None
-model = None
-label_encoder = None
+# Load all models at startup
+load_all_models()
 
-# Initialize key-to-gesture mapping for alphabets only
-key_to_gesture = {}
-for i in range(26):
-    key = string.ascii_lowercase[i]
-    gesture = key.upper()
-    key_to_gesture[key] = gesture
+# Map signs to model group numbers for ASL and ISL
+sign_to_model_group = {
+    'asl': {
+        'A': 1, 'B': 1, 'C': 1, 'D': 1, 'E': 1,
+        'F': 2, 'G': 2, 'H': 2, 'I': 2, 'J': 2,
+        'K': 3, 'L': 3, 'M': 3, 'N': 3, 'O': 3,
+        'P': 4, 'Q': 4, 'R': 4, 'S': 4, 'T': 4,
+        'U': 5, 'V': 5, 'W': 5, 'X': 5, 'Y': 5,
+        'Z': 6, 'DOG': 6, 'THANK_YOU': 6, 'LOVE': 6
+    },
+    'isl': {
+        'X': 1, 'Y': 1, 'Z': 1  # Add ISL-specific signs here if more exist
+    }
+}
 
-manual_override_gesture = None  # Initialize manual override variable
+@app.route('/predict', methods=['POST'])
+def predict():
+    # Check if image, expected_sign, and language are in the request
+    if 'image' not in request.files or 'expected_sign' not in request.form or 'language' not in request.form:
+        return jsonify({'error': 'Image, expected_sign, or language not provided'}), 400
 
-# Function to load the model based on group number
-def load_model(group_number):
-    global model, label_encoder
-    model_file = f'model_group_{group_number}.p'
-    try:
-        with open(model_file, 'rb') as f:
-            model_dict = pickle.load(f)
-        model = model_dict['model']
-        label_encoder = model_dict['label_encoder']
-        print("Model loaded for group", group_number)
-    except FileNotFoundError:
-        model = None
-        label_encoder = None
+    image_file = request.files['image']
+    expected_sign = request.form['expected_sign'].upper()
+    language = request.form['language'].lower()
 
-print("=== Hand Gesture Recognition Inference ===")
-print("Press 'Esc' to quit the application.")
-print("Press 'c' to clear the current sentence.")
-print("Press 'Space' to add a space to the sentence.")
-load_model(1)
-while True:
+    if language not in ['asl', 'isl']:
+        return jsonify({'error': 'Invalid language. Must be "asl" or "isl"'}), 400
+
+    if expected_sign not in sign_to_model_group[language]:
+        return jsonify({'error': f'Invalid expected_sign for language {language}'}), 400
+
+    # Read image file
+    file_bytes = np.frombuffer(image_file.read(), np.uint8)
+    image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+    if image is None:
+        return jsonify({'error': 'Invalid image'}), 400
+
+    # Process image with MediaPipe
+    frame_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    results = hands.process(frame_rgb)
+
+    if not results.multi_hand_landmarks:
+        return jsonify({'error': 'No hand detected in the image'}), 400
+
+    # Extract landmarks
     data_aux = []
     x_ = []
     y_ = []
     z_ = []
-    current_time = time.time()
 
-    ret, frame = cap.read()
-    if not ret:
-        break
+    hand_landmarks = results.multi_hand_landmarks[0]
+    for lm in hand_landmarks.landmark:
+        x_.append(lm.x)
+        y_.append(lm.y)
+        z_.append(lm.z)
 
-    frame = cv2.flip(frame, 1)
-    H, W, _ = frame.shape
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = hands.process(frame_rgb)
+    if x_ and y_ and z_:
+        min_x = min(x_)
+        min_y = min(y_)
+        min_z = min(z_)
+        for x_val, y_val, z_val in zip(x_, y_, z_):
+            data_aux.extend([x_val - min_x, y_val - min_y, z_val - min_z])
 
-    predicted_gesture = None
+        if len(data_aux) != 63:
+            return jsonify({'error': 'Invalid data length'}), 400
 
-    if results.multi_hand_landmarks and model is not None:
-        hand_landmarks = results.multi_hand_landmarks[0]
-        mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-        for lm in hand_landmarks.landmark:
-            x_.append(lm.x)
-            y_.append(lm.y)
-            z_.append(lm.z)
+        X_input = np.array(data_aux).reshape(1, -1)
 
-        if x_ and y_ and z_:
-            min_x = min(x_)
-            min_y = min(y_)
-            min_z = min(z_)
-            for x_val, y_val, z_val in zip(x_, y_, z_):
-                data_aux.extend([x_val - min_x, y_val - min_y, z_val - min_z])
+        # Get the appropriate model and label encoder
+        model_group = sign_to_model_group[language][expected_sign]
+        model = models[language].get(model_group)
+        label_encoder = label_encoders[language].get(model_group)
 
-            if len(data_aux) == 63:
-                X_input = np.array(data_aux).reshape(1, -1)
-                y_pred = model.predict(X_input)
-                predicted_class = label_encoder.inverse_transform(y_pred)[0]
-                predicted_gesture = predicted_class
+        if model is None or label_encoder is None:
+            return jsonify({'error': f'Model for group {model_group} not found in {language} model folder'}), 500
 
-    key = cv2.waitKey(1) & 0xFF
+        y_pred = model.predict(X_input)
+        predicted_class = label_encoder.inverse_transform(y_pred)[0]
 
-    if key == 27:  # Escape key
-        break
-    elif key in [ord(str(i)) for i in range(1, 7)]:
-        group_number = key - ord('0')
-        if group_number != current_group_number:
-            load_model(group_number)
-            current_group_number = group_number
-    elif key == ord(' '):
-        current_sentence += ' '
-    elif key in [ord('c'), ord('C')]:
-        current_sentence = ""
-    elif key == ord('0'):
-        manual_override_gesture = None
+        # Compare with expected sign
+        result = (predicted_class == expected_sign)
+
+        return jsonify({
+            'result': result,
+            'predicted_sign': predicted_class,
+            'expected_sign': expected_sign
+        })
     else:
-        key_char = chr(key).lower()
-        if key_char in key_to_gesture:
-            manual_override_gesture = key_to_gesture[key_char]
+        return jsonify({'error': 'Could not extract landmarks'}), 400
 
-    if manual_override_gesture is not None:
-        detected_gesture = manual_override_gesture
-    else:
-        detected_gesture = predicted_gesture
-
-    if detected_gesture != last_gesture:
-        if detected_gesture is not None:
-            gesture_start_time = current_time
-            gesture_added = False
-        last_gesture = detected_gesture
-    else:
-        if detected_gesture is not None and not gesture_added:
-            if (current_time - gesture_start_time) >= gesture_threshold:
-                current_sentence += detected_gesture
-                gesture_added = True
-
-    if detected_gesture is not None:
-        if x_ and y_:
-            x1 = int(min(x_) * W) - 10
-            y1 = int(min(y_) * H) - 10
-            x2 = int(max(x_) * W) + 10
-            y2 = int(max(y_) * H) + 10
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, detected_gesture, (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-        else:
-            cv2.putText(frame, detected_gesture, (50, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-    else:
-        if model is None:
-            cv2.putText(frame, 'No model loaded. Press 1-6 to load a model.', (30, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
-        else:
-            cv2.putText(frame, 'No hands detected', (30, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-
-    cv2.putText(frame, f'Sentence: {current_sentence}', (10, H - 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-    cv2.imshow('Hand Gesture Recognition', frame)
-
-cap.release()
-cv2.destroyAllWindows()
+if __name__ == '__main__':
+    app.run(debug=True)

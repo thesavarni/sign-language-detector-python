@@ -6,7 +6,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 import glob
 
 # Get list of data group pickle files
-data_files = sorted(glob.glob('data_group_*.pickle'))
+data_files = sorted(glob.glob('./asl_dataset_pickle/data_group_*.pickle'))
 
 for data_file in data_files:
     # Extract group number from file name
@@ -52,7 +52,7 @@ for data_file in data_files:
     print(confusion_matrix(y_test, y_pred))
 
     # Save the trained model and label encoder
-    model_file = f'model_group_{group_number}.p'
+    model_file = f'./asl_model/model_group_{group_number}.p'
     with open(model_file, 'wb') as f:
         pickle.dump({'model': model, 'label_encoder': label_encoder}, f)
 
