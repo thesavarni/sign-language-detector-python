@@ -5,6 +5,9 @@
   "dependencies": {
     "@emotion/react": "^11.13.5",
     "@emotion/styled": "^11.13.5",
+    "@mediapipe/camera_utils": "^0.3.1675466862",
+    "@mediapipe/drawing_utils": "^0.3.1675466124",
+    "@mediapipe/hands": "^0.4.1675469240",
     "@mui/icons-material": "^6.1.8",
     "@mui/material": "^6.1.8",
     "@testing-library/jest-dom": "^5.17.0",

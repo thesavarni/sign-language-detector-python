@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
-import USFlag from './flags/us-flag.svg'; // Import the SVG file
-import IndiaFlag from './flags/india-flag-image.png'; // Import the SVG file
-import logo1 from './mudra-ai-logos/logo1.jpeg'
+import USFlag from './flags/us-flag.svg';
+import IndiaFlag from './flags/india-flag-image.png';
+import logo1 from './mudra-ai-logos/logo1.jpeg';
 
-
+import { Hands, HAND_CONNECTIONS } from '@mediapipe/hands';
+import { Camera } from '@mediapipe/camera_utils';
+import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 
 const App = () => {
   const [mode, setMode] = useState('training'); // 'training' or 'testing'
@@ -12,30 +14,116 @@ const App = () => {
   const [currentGesture, setCurrentGesture] = useState(null);
   const [feedback, setFeedback] = useState('');
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
     requestGesture();
-    startVideoStream();
   }, [language]);
 
-  const startVideoStream = () => {
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then((stream) => {
-        videoRef.current.srcObject = stream;
-      })
-      .catch((err) => {
-        console.error('Error accessing webcam: ', err);
-      });
+  useEffect(() => {
+    const hands = new Hands({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      },
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+
+    hands.onResults(onResults);
+
+    const videoElement = videoRef.current;
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({ image: videoElement });
+      },
+      width: 1280,
+      height: 720,
+    });
+    camera.start();
+
+    // Clean up on unmount
+    return () => {
+      camera.stop();
+    };
+  }, []);
+
+  const onResults = (results) => {
+    const canvasElement = canvasRef.current;
+    const canvasCtx = canvasElement.getContext('2d');
+
+    const videoWidth = videoRef.current.videoWidth;
+    const videoHeight = videoRef.current.videoHeight;
+
+    canvasElement.width = videoWidth;
+    canvasElement.height = videoHeight;
+
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasCtx.drawImage(
+      results.image,
+      0,
+      0,
+      canvasElement.width,
+      canvasElement.height
+    );
+
+    if (results.multiHandLandmarks && results.multiHandedness) {
+      for (let index = 0; index < results.multiHandLandmarks.length; index++) {
+        const classification = results.multiHandedness[index];
+        const isRightHand = classification.label === 'Right';
+        const landmarks = results.multiHandLandmarks[index];
+        drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
+          color: isRightHand ? '#00FF00' : '#FF0000',
+          lineWidth: 5,
+        });
+        drawLandmarks(canvasCtx, landmarks, {
+          color: isRightHand ? '#00FF00' : '#FF0000',
+          lineWidth: 2,
+        });
+      }
+    }
+    canvasCtx.restore();
   };
 
   const requestGesture = () => {
-    const gestures = language === 'asl'
-      ? ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-         'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-         'U', 'V', 'W', 'X', 'Y', 'Z']
-      : ['X', 'Y', 'Z']; // Update with ISL gestures if available
-    const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
+    const gestures =
+      language === 'asl'
+        ? [
+            'A',
+            'B',
+            'C',
+            'D',
+            'E',
+            'F',
+            'G',
+            'H',
+            'I',
+            'J',
+            'K',
+            'L',
+            'M',
+            'N',
+            'O',
+            'P',
+            'Q',
+            'R',
+            'S',
+            'T',
+            'U',
+            'V',
+            'W',
+            'X',
+            'Y',
+            'Z',
+          ]
+        : ['X', 'Y', 'Z']; // Update with ISL gestures if available
+    const randomGesture =
+      gestures[Math.floor(Math.random() * gestures.length)];
     setCurrentGesture(randomGesture);
   };
 
@@ -53,11 +141,10 @@ const App = () => {
 
       canvas.toBlob(
         (blob) => {
-          // Create a FormData object to send image and expected_sign
           const formData = new FormData();
           formData.append('image', blob, 'gesture.jpg');
           formData.append('expected_sign', currentGesture);
-          formData.append('language', language)
+          formData.append('language', language);
 
           fetch('https://web-production-08f6.up.railway.app/predict', {
             method: 'POST',
@@ -68,9 +155,10 @@ const App = () => {
               if (data.result) {
                 setFeedback('✅ Correct sign detected!');
               } else {
-                setFeedback(`❌ Incorrect sign. Predicted: ${data.predicted_sign}`);
+                setFeedback(
+                  `❌ Incorrect sign. Predicted: ${data.predicted_sign}`
+                );
               }
-              // Request a new gesture for the next round
               requestGesture();
             })
             .catch((error) => {
@@ -89,7 +177,11 @@ const App = () => {
   return (
     <div className="App">
       <div className="header">
-      <img src={logo1} className="logo"  style={{ borderRadius: '50%' }}/>
+        <img
+          src={logo1}
+          className="logo"
+          style={{ borderRadius: '50%' }}
+        />
         <h1>MUDRA AI</h1>
       </div>
 
@@ -111,11 +203,11 @@ const App = () => {
             setFeedback('');
           }}
         >
-        <img 
-          src={IndiaFlag}
-          style={{ width: '40px', height: '40px' }}
-          className="button-icon" 
-        />
+          <img
+            src={IndiaFlag}
+            style={{ width: '40px', height: '40px' }}
+            className="button-icon"
+          />
           <span>ISL</span>
         </button>
       </div>
@@ -140,7 +232,10 @@ const App = () => {
           <div className="camera-feed">
             <div className="gesture-info">
               <h2>Make Gesture for: {currentGesture}</h2>
-              <video ref={videoRef} autoPlay className="video-feed"></video>
+              <div className="video-container">
+                <video ref={videoRef} className="video-feed"></video>
+                <canvas ref={canvasRef} className="canvas-overlay"></canvas>
+              </div>
             </div>
           </div>
         </div>

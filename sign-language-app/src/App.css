@@ -163,3 +163,20 @@ button span {
     margin: 10px 0;
   }
 }
+
+.video-container {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  height: 300px;
+}
+
+.video-feed, .canvas-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+}
