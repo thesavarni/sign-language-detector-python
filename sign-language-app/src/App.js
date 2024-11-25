@@ -112,13 +112,19 @@ const App = () => {
         <div className="content">
           <div className="gesture-display">
             {mode === 'training' ? (
-              <div className="gesture-info">
-                <h2>Gesture: {currentGesture}</h2>
+            <div className="gesture-info">
+              <h2>Gesture: {currentGesture}</h2>
+              {console.log("Gesture", currentGesture)}
+              {console.log("PUBLIC URL", process.env.PUBLIC_URL)}
+              {currentGesture ? (
                 <img
-                  src={`path_to_image_folder/${currentGesture}.jpg`}
+                  src={`/asl_dataset/${currentGesture}.png`}
                   alt={`Hand sign for ${currentGesture}`}
                 />
-              </div>
+              ) : (
+                <p>No gesture selected.</p>
+              )}
+            </div>            
             ) : (
               <div className="gesture-info">
                 <h2>Make Gesture for Alphabet: {currentGesture}</h2>
