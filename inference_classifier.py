@@ -12,16 +12,11 @@ warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
 
-# Restrict CORS to only allow requests from your frontend
+# Allow CORS from your frontend
 CORS(app, resources={r"/predict": {"origins": "https://mudra-ai.netlify.app"}})
 
 # Initialize MediaPipe hands
 mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(
-    static_image_mode=True,  # Since we are processing images, not video
-    max_num_hands=1,
-    min_detection_confidence=0.5
-)
 
 # Load models and label encoders for both ASL and ISL
 models = {
@@ -43,7 +38,7 @@ def load_all_models():
                     model_dict = pickle.load(f)
                 models[language][group_number] = model_dict['model']
                 label_encoders[language][group_number] = model_dict['label_encoder']
-                print(f"Model loaded for {language} group {group_number}")
+                print(f"Model loaded for {language.upper()} group {group_number}")
             except FileNotFoundError:
                 print(f"Model file not found for {language} group {group_number}")
 
@@ -61,7 +56,8 @@ sign_to_model_group = {
         'Z': 6, 'DOG': 6, 'THANK_YOU': 6, 'LOVE': 6
     },
     'isl': {
-        'X': 1, 'Y': 1, 'Z': 1  # Add ISL-specific signs here if more exist
+        'A': 1, 'B': 1,  'D': 1, 'E': 1, 'F': 1,
+        'G': 2, 'H': 2,
     }
 }
 
@@ -88,6 +84,21 @@ def predict():
     if image is None:
         return jsonify({'error': 'Invalid image'}), 400
 
+    # Set max_num_hands based on language
+    if language == 'asl':
+        max_hands = 1
+    elif language == 'isl':
+        max_hands = 2
+    else:
+        return jsonify({'error': 'Unsupported language'}), 400
+
+    # Initialize MediaPipe hands with the appropriate max_num_hands
+    hands = mp_hands.Hands(
+        static_image_mode=True,
+        max_num_hands=max_hands,
+        min_detection_confidence=0.5
+    )
+
     # Process image with MediaPipe
     frame_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = hands.process(frame_rgb)
@@ -97,25 +108,32 @@ def predict():
 
     # Extract landmarks
     data_aux = []
-    x_ = []
-    y_ = []
-    z_ = []
+    x_all = []
+    y_all = []
+    z_all = []
 
-    hand_landmarks = results.multi_hand_landmarks[0]
-    for lm in hand_landmarks.landmark:
-        x_.append(lm.x)
-        y_.append(lm.y)
-        z_.append(lm.z)
+    for hand_landmarks in results.multi_hand_landmarks:
+        x_ = []
+        y_ = []
+        z_ = []
+        for lm in hand_landmarks.landmark:
+            x_.append(lm.x)
+            y_.append(lm.y)
+            z_.append(lm.z)
+        x_all.extend(x_)
+        y_all.extend(y_)
+        z_all.extend(z_)
 
-    if x_ and y_ and z_:
-        min_x = min(x_)
-        min_y = min(y_)
-        min_z = min(z_)
-        for x_val, y_val, z_val in zip(x_, y_, z_):
+    if x_all and y_all and z_all:
+        min_x = min(x_all)
+        min_y = min(y_all)
+        min_z = min(z_all)
+        for x_val, y_val, z_val in zip(x_all, y_all, z_all):
             data_aux.extend([x_val - min_x, y_val - min_y, z_val - min_z])
 
-        if len(data_aux) != 63:
-            return jsonify({'error': 'Invalid data length'}), 400
+        expected_length = 63 * max_hands  # 63 features per hand
+        if len(data_aux) != expected_length:
+            return jsonify({'error': 'Invalid data length'}, 400)
 
         X_input = np.array(data_aux).reshape(1, -1)
 

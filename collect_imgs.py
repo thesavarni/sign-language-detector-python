@@ -1,7 +1,7 @@
 import os
 import cv2 # OpenCV
 
-DATA_DIR = './data'
+DATA_DIR = './data/isl'
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
@@ -9,16 +9,12 @@ if not os.path.exists(DATA_DIR):
 class_names = [
     'A', 'B', 'C', 'D', 'E',
     'F', 'G', 'H', 'I', 'J',
-    'K', 'L', 'M', 'N', 'O',
-    'P', 'Q', 'R', 'S', 'T',
-    'U', 'V', 'W', 'X', 'Y',
-    'Z', 'DOG', 'THANK_YOU', 'Love'
 ]
 
 # Create a list of tuples (class_number, class_name)
 class_list = [(i+1, name) for i, name in enumerate(class_names)]
 
-dataset_size = 200  # Number of images per class
+dataset_size = 50  # Number of images per class
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)

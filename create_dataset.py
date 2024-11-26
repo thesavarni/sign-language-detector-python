@@ -5,17 +5,16 @@ import cv2
 import numpy as np
 import re
 
-# Initialize Mediapipe Hands
+# Initialize Mediapipe Hands for ASL and ISL
 mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(
-    static_image_mode=True,
-    max_num_hands=1,
-    min_detection_confidence=0.3
-)
 
-DATA_DIR = './data'
+# Data directories for ASL and ISL
+DATA_DIRS = {
+    'asl': './data/asl',
+    'isl': './data/isl'
+}
 
-# Get list of class directories sorted by their class number
+# Function to get sorted class directories
 def get_sorted_class_dirs(data_dir):
     class_dirs = []
     for item in os.listdir(data_dir):
@@ -30,62 +29,90 @@ def get_sorted_class_dirs(data_dir):
     class_dirs.sort(key=lambda x: x[0])
     return class_dirs
 
-class_dirs = get_sorted_class_dirs(DATA_DIR)
+for language, data_dir in DATA_DIRS.items():
+    print(f"Processing language: {language.upper()}")
+    class_dirs = get_sorted_class_dirs(data_dir)
 
-# Group the class directories into sets of 5
-group_size = 5
-groups = [class_dirs[i:i+group_size] for i in range(0, len(class_dirs), group_size)]
+    # Group the class directories into sets of 5
+    group_size = 5
+    groups = [class_dirs[i:i+group_size] for i in range(0, len(class_dirs), group_size)]
 
-for idx, group in enumerate(groups):
-    data = []
-    labels = []
-    print(f'Processing group {idx+1}')
-    for class_number, class_dir in group:
-        class_name = os.path.basename(class_dir).split('_', 1)[1]
-        print(f'  Processing class "{class_name}"')
-        for img_name in os.listdir(class_dir):
-            data_aux = []
-            x_ = []
-            y_ = []
-            z_ = []
+    # Set max_num_hands based on language
+    if language == 'asl':
+        continue
+        max_hands = 1
+    elif language == 'isl':
+        max_hands = 2
+    else:
+        continue  # Skip unknown languages
 
-            img_path = os.path.join(class_dir, img_name)
-            img = cv2.imread(img_path)
-            if img is None:
-                continue
+    hands = mp_hands.Hands(
+        static_image_mode=True,
+        max_num_hands=max_hands,
+        min_detection_confidence=0.3
+    )
 
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    for idx, group in enumerate(groups):
+        data = []
+        labels = []
+        print(f'  Processing group {idx+1}')
+        for class_number, class_dir in group:
+            class_name = os.path.basename(class_dir).split('_', 1)[1]
+            print(f'    Processing class "{class_name}"')
+            for img_name in os.listdir(class_dir):
+                data_aux = []
+                x_all = []
+                y_all = []
+                z_all = []
 
-            results = hands.process(img_rgb)
-            if results.multi_hand_landmarks:
-                hand_landmarks = results.multi_hand_landmarks[0]
-                for lm in hand_landmarks.landmark:
-                    x_.append(lm.x)
-                    y_.append(lm.y)
-                    z_.append(lm.z)
+                img_path = os.path.join(class_dir, img_name)
+                img = cv2.imread(img_path)
+                if img is None:
+                    continue
 
-                # Normalize landmarks by subtracting the minimum value
-                min_x = min(x_)
-                min_y = min(y_)
-                min_z = min(z_)
+                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-                for x_val, y_val, z_val in zip(x_, y_, z_):
-                    data_aux.append(x_val - min_x)
-                    data_aux.append(y_val - min_y)
-                    data_aux.append(z_val - min_z)
-                # [(x1,y1,z1), (x2,y2,z2), ]
-                data.append(data_aux)
-                labels.append(class_name)
-            else:
-                print(f'    No hand landmarks detected in image: {img_name}')
+                results = hands.process(img_rgb)
+                if results.multi_hand_landmarks:
+                    for hand_landmarks in results.multi_hand_landmarks:
+                        x_ = []
+                        y_ = []
+                        z_ = []
+                        for lm in hand_landmarks.landmark:
+                            x_.append(lm.x)
+                            y_.append(lm.y)
+                            z_.append(lm.z)
+                        x_all.extend(x_)
+                        y_all.extend(y_)
+                        z_all.extend(z_)
+                    # Normalize landmarks by subtracting the minimum value
+                    if x_all and y_all and z_all:
+                        min_x = min(x_all)
+                        min_y = min(y_all)
+                        min_z = min(z_all)
 
-    # Save the processed data for this group
-    pickle_file = f'./asl_dataset_pickle/data_group_{idx+1}.pickle'
-    with open(pickle_file, 'wb') as f:
-        pickle.dump({'data': data, 'labels': labels}, f)
-    print(f"  Saved group {idx+1} data to '{pickle_file}'.\n")
+                        for x_val, y_val, z_val in zip(x_all, y_all, z_all):
+                            data_aux.extend([x_val - min_x, y_val - min_y, z_val - min_z])
 
-print("Data processing complete for all groups.")
-# for 1 image
-# [(22 landmarks ka list)] -> A (fist image) -> 200 more images all of A
-# # [(22 landmarks ka list)] -> A (fist image) -> 200 more images all of B
+                        expected_length = 63 * max_hands  # 63 features per hand
+                        if len(data_aux) != expected_length:
+                            print(f" length {len(data_aux)} hands {max_hands}:    Skipping image {img_name} due to incorrect data length.")
+                            continue
+                        data.append(data_aux)
+                        labels.append(class_name)
+                    else:
+                        print(f"      No landmarks extracted for image: {img_name}")
+                else:
+                    print(f'      No hand landmarks detected in image: {img_name}')
+
+        # Save the processed data for this group
+        output_dir = f'./{language}_dataset_pickle'
+        os.makedirs(output_dir, exist_ok=True)
+        pickle_file = os.path.join(output_dir, f'data_group_{idx+1}.pickle')
+        with open(pickle_file, 'wb') as f:
+            pickle.dump({'data': data, 'labels': labels}, f)
+        print(f"    Saved group {idx+1} data to '{pickle_file}'.\n")
+
+    print(f"Data processing complete for {language.upper()}.\n")
+
+print("Data processing complete for all languages.")
