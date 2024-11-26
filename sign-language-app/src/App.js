@@ -27,8 +27,9 @@ const App = () => {
       },
     });
 
+    // Adjust maxNumHands based on language
     hands.setOptions({
-      maxNumHands: 1,
+      maxNumHands: language === 'isl' ? 2 : 1, // ISL uses two hands
       modelComplexity: 1,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5,
@@ -47,12 +48,13 @@ const App = () => {
       });
       camera.start();
 
-      // Clean up on unmount
+      // Clean up on unmount or language change
       return () => {
         camera.stop();
+        hands.close();
       };
     }
-  }, []);
+  }, [language]); // Reinitialize when language changes
 
   const onResults = (results) => {
     const canvasElement = canvasRef.current;
@@ -126,7 +128,13 @@ const App = () => {
             'Y',
             'Z',
           ]
-        : ['X', 'Y', 'Z']; // Update with ISL gestures if available
+        : [
+            // Update with actual ISL gestures
+            'A',
+            'B',
+            'D', 'E', 'F', 'G', 'H'
+            // ... add more ISL gestures
+          ];
     const randomGesture =
       gestures[Math.floor(Math.random() * gestures.length)];
     setCurrentGesture(randomGesture);
@@ -179,6 +187,18 @@ const App = () => {
     }
   };
 
+  // Automatically check gesture after 1 second for ISL
+  useEffect(() => {
+    if (language === 'isl') {
+      const timer = setTimeout(() => {
+        checkGesture();
+        requestGesture();
+      }, 5000); // 1-second delay
+
+      return () => clearTimeout(timer); // Clean up the timer on unmount or change
+    }
+  }, [currentGesture, language]);
+
   return (
     <div className="App">
       <div className="header">
@@ -224,18 +244,18 @@ const App = () => {
           <div className="gesture-display">
             <div className="gesture-info">
               <h2>Gesture: {currentGesture}</h2>
-              {console.log("currentGesture", currentGesture)}
               {currentGesture ? (
                 mode === 'training' ? (
                   <img
                     className="gesture-image"
-                    src={`/asl_dataset/${currentGesture}.png`}
+                    src={`/${language}_dataset/${currentGesture}.png`} // Updated to use language
                     alt={`Hand sign for ${currentGesture}`}
                   />
                 ) : (
                   <img
                     className="gesture-image"
                     src={`/alphabet_images/${currentGesture}.png`}
+                    alt={`Letter ${currentGesture}`}
                   />
                 )
               ) : (
@@ -259,7 +279,11 @@ const App = () => {
             </div>
           </div>
         </div>
-        <button className="check-gesture-button" onClick={checkGesture}>
+        <button
+          className="check-gesture-button"
+          onClick={checkGesture}
+          disabled={language === 'isl'} // Optionally disable for ISL
+        >
           Check Gesture
         </button>
       </div>
