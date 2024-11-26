@@ -192,7 +192,7 @@ const App = () => {
     if (language === 'isl') {
       const timer = setTimeout(() => {
         checkGesture();
-        requestGesture();
+        // requestGesture();
       }, 5000); // 1-second delay
 
       return () => clearTimeout(timer); // Clean up the timer on unmount or change
