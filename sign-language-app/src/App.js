@@ -15,6 +15,7 @@ const App = () => {
   const [feedback, setFeedback] = useState('');
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const [theme, setTheme] = useState('light');
 
   useEffect(() => {
     requestGesture();
@@ -55,6 +56,10 @@ const App = () => {
       };
     }
   }, [language]); // Reinitialize when language changes
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const onResults = (results) => {
     const canvasElement = canvasRef.current;
@@ -199,8 +204,27 @@ const App = () => {
     }
   }, [currentGesture, language]);
 
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
   return (
     <div className="App">
+      <div className="theme-toggle">
+        <div 
+          className={`theme-toggle-track ${theme}`} 
+          onClick={toggleTheme}
+        >
+          <div className="theme-toggle-thumb">
+            {theme === 'light' ? (
+              <span className="theme-icon">☀️</span>
+            ) : (
+              <span className="theme-icon">🌙</span>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="header">
         <img
           src={logo1}

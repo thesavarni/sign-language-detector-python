@@ -1,6 +1,25 @@
+:root {
+  --background-color: #f0f0f0;
+  --app-background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 240, 240, 0.9));
+  --content-background: #ffffff;
+  --text-color: #000000;
+  --gesture-info-background: #f9f9f9;
+  --button-hover: #e0e0e0;
+}
+
+[data-theme='dark'] {
+  --background-color: #1a1a1a;
+  --app-background: linear-gradient(135deg, rgba(30, 30, 30, 0.9), rgba(20, 20, 20, 0.9));
+  --content-background: #2d2d2d;
+  --text-color: #ffffff;
+  --gesture-info-background: #363636;
+  --button-hover: #404040;
+}
+
 body {
   font-family: Arial, sans-serif;
-  background-color: #f0f0f0;
+  background-color: var(--background-color);
+  color: var(--text-color);
   margin: 0;
   padding: 0;
   display: flex;
@@ -14,7 +33,7 @@ body {
 }
 
 .App {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 240, 240, 0.9)),
+  background: var(--app-background),
               url('./mudra-ai-logos/MudraAIBackground.jpeg');
   background-size: cover, contain;
   background-blend-mode: overlay;
@@ -25,6 +44,7 @@ body {
   padding: 20px;
   position: relative;
   z-index: 1;
+  color: var(--text-color);
 }
 
 
@@ -62,7 +82,7 @@ button {
 }
 
 button:hover {
-  background-color: #e0e0e0;
+  background-color: var(--button-hover);
 }
 
 button.active {
@@ -81,7 +101,7 @@ button span {
 }
 
 .content-platform {
-  background-color: #ffffff;
+  background-color: var(--content-background);
   border-radius: 15px;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
   padding: 30px;
@@ -102,7 +122,7 @@ button span {
 }
 
 .gesture-info {
-  background-color: #f9f9f9;
+  background-color: var(--gesture-info-background);
   padding: 20px;
   border-radius: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -110,6 +130,7 @@ button span {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  color: var(--text-color);
 }
 
 .gesture-image, .video-feed {
@@ -179,4 +200,49 @@ button span {
   height: 100%;
   object-fit: cover;
   border-radius: 10px;
+}
+
+.theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.theme-toggle-track {
+  width: 60px;
+  height: 30px;
+  background-color: #4a4a4a;
+  border-radius: 15px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.theme-toggle-track.light {
+  background-color: #87CEEB;
+}
+
+.theme-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 26px;
+  height: 26px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle-track.light .theme-toggle-thumb {
+  transform: translateX(30px);
+}
+
+.theme-icon {
+  font-size: 16px;
+  color: #4a4a4a;
 }
